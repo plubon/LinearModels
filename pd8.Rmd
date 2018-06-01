@@ -1,0 +1,106 @@
+---
+title: "Praca Domowa VIII"
+author: "Piotr Luboń"
+date: "May 31, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd('/home/piotr/Uczelnia/StatystykaObliczeniowa')
+```
+
+#Zadanie 4
+
+```{r, echo=FALSE}
+library('MASS')
+library('kableExtra')
+library('glmnet')
+original_data <- read.csv('BostonHousing.csv')
+original_data[,-14] <- scale(original_data[,-14])
+modified_data  <- data.frame(original_data)
+modified_data$feat1 <- modified_data$indus*2 + modified_data$b*0.5
+modified_data$feat2 <- rnorm(nrow(modified_data))
+modified_data$feat3 <- sqrt(abs(modified_data$tax))
+modified_data$feat4 <- modified_data$lstat * modified_data$nox
+modified_data[,-14] <- scale(modified_data[,-14])
+```
+Nowy zbiór danych powstaje poprzez dodanie 4 zmiennych:
+1. kombinacja liniowa kolumn $b$ i $indus$
+2. wartości wygenerowane losowo z rozkładu normalnego
+3. pierwiastek z wartości bezwzględnej kolumny $tax$
+4. iloczyn kolumn $lstat$ i $nox$
+
+Wszystkie zmienne zostają wystandaryzowane. Poniżej przedstawione wartośći błędu średniokwadratowego po przeprowadzniu pięciokrotnej walidacji krzyżowej dla obu zbiór danych i wybranych metod selekcji zmiennych dla następujących modeli:
+1. regersja lasso
+2. regresja ridge
+3. elastic net dla najlepszej wartości alpha wybranej poprzez spradzanie wartości z przedziału $(0,1)$ co $0.1$
+##Bazowy model, wszystkie zmienne
+```{r, echo=FALSE}
+data <- original_data
+lasso <- cv.glmnet(as.matrix(data[,-14]), data[, 14], alpha = 1, type.measure = 'mse', nfolds=5)
+ridge <- cv.glmnet(as.matrix(data[,-14]), data[, 14], alpha = 0, type.measure = 'mse', nfolds=5)
+best_mse <- Inf
+best_model <- NA
+best_alpha <- NA
+for(alpha in seq(0.1,0.9,0.1))
+{
+  model <- cv.glmnet(as.matrix(data[,-14]), data[, 14], alpha = alpha, type.measure = 'mse', nfolds=5)
+  if(min(model$cvm) < best_mse)
+  {
+    best_alpha <- alpha
+    best_model <- model
+    best_mse <- min(model$cvm)
+  }
+}
+table <- data.frame(MSE =c(min(lasso$cvm), min(ridge$cvm), best_mse))
+table$lambda <- c(lasso$lambda.min, ridge$lambda.min, model$lambda.min)
+rownames(table) <- c('lasso','ridge',paste('elasticnet alpha=', best_alpha))
+kableExtra::kable(table)
+```
+##Model z dodtakowymi zmiennymi, wszystkie zmienne
+```{r, echo=FALSE}
+data <- modified_data
+lasso <- cv.glmnet(as.matrix(data[,-14]), data[, 14], alpha = 1, type.measure = 'mse', nfolds=5)
+ridge <- cv.glmnet(as.matrix(data[,-14]), data[, 14], alpha = 0, type.measure = 'mse', nfolds=5)
+best_mse <- Inf
+best_model <- NA
+best_alpha <- NA
+for(alpha in seq(0.1,0.9,0.1))
+{
+  model <- cv.glmnet(as.matrix(data[,-14]), data[, 14], alpha = alpha, type.measure = 'mse', nfolds=5)
+  if(min(model$cvm) < best_mse)
+  {
+    best_alpha <- alpha
+    best_model <- model
+    best_mse <- min(model$cvm)
+  }
+}
+table <- data.frame(MSE =c(min(lasso$cvm), min(ridge$cvm), best_mse))
+table$lambda <- c(lasso$lambda.min, ridge$lambda.min, model$lambda.min)
+rownames(table) <- c('lasso','ridge',paste('elasticnet alpha=', best_alpha))
+kableExtra::kable(table)
+```
+##Bazowy model, metoda selekcji "forward""
+```{r, echo=FALSE}
+data <- original_data
+lasso <- step(cv.glmnet(as.matrix(data[,-14]), data[, 14], alpha = 1, type.measure = 'mse', nfolds=5), direction = 'forward')
+ridge <- cv.glmnet(as.matrix(data[,-14]), data[, 14], alpha = 0, type.measure = 'mse', nfolds=5)
+best_mse <- Inf
+best_model <- NA
+best_alpha <- NA
+for(alpha in seq(0.1,0.9,0.1))
+{
+  model <- cv.glmnet(as.matrix(data[,-14]), data[, 14], alpha = alpha, type.measure = 'mse', nfolds=5)
+  if(min(model$cvm) < best_mse)
+  {
+    best_alpha <- alpha
+    best_model <- model
+    best_mse <- min(model$cvm)
+  }
+}
+table <- data.frame(MSE =c(min(lasso$cvm), min(ridge$cvm), best_mse))
+table$lambda <- c(lasso$lambda.min, ridge$lambda.min, model$lambda.min)
+rownames(table) <- c('lasso','ridge',paste('elasticnet alpha=', best_alpha))
+kableExtra::kable(table)
+```
